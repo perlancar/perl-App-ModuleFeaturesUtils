@@ -6,7 +6,7 @@ package App::ModuleFeaturesUtils;
 # VERSION
 
 use 5.010001;
-use strict;
+use strict 'subs', 'vars';
 use warnings;
 
 use Perinci::Sub::Args::Common::CLI qw(%argspec_detail);
@@ -15,7 +15,7 @@ our %SPEC;
 
 our %argspecreq0_feature_set = (
     feature_set => {
-        schema => 'perl::modulefeature::modname*',
+        schema => 'perl::modulefeatures::modname*',
         req => 1,
         pos => 0,
     },
@@ -26,6 +26,25 @@ our %argspecreq0_module = (
         schema => 'perl::modname*',
         req => 1,
         pos => 0,
+    },
+);
+
+our %argspec1_feature_name = (
+    feature_name => {
+        schema => 'str*', # XXX completion
+        description => <<'_',
+
+Can be unqualified:
+
+    feature_name
+
+or qualified with feature set name using the `::` or `/` separator:
+
+    Feature::SetName::feature_name
+    Feature/SetName/feature_name
+
+_
+        pos => 1,
     },
 );
 
@@ -80,6 +99,8 @@ $SPEC{list_feature_set_features} = {
     },
 };
 sub list_feature_set_features {
+    require Data::Sah::Util::Type;
+
     my %args = @_;
 
     my $mod = "Module::Features::$args{feature_set}";
@@ -96,7 +117,7 @@ sub list_feature_set_features {
                 name    => $fname,
                 summary => $fspec->{summary},
                 req     => $fspec->{req} // 0,
-                schema  => $fspec->{schema} // 'bool',
+                schema_type => Data::Sah::Util::Type::get_type($fspec->{schema} // 'bool'),
             };
         } else {
             push @rows, $fname;
@@ -110,11 +131,11 @@ $SPEC{check_feature_set_spec} = {
     summary => 'Check specification in %FEATURES_DEF in Modules::Features::* module',
     args => {
         %argspecreq0_feature_set,
-        %argspec_detail,
     },
 };
 sub check_feature_set_spec {
     require Module::FeaturesUtil::Check;
+
     my %args = @_;
 
     my $mod = "Module::Features::$args{feature_set}";
@@ -125,24 +146,69 @@ sub check_feature_set_spec {
     Module::FeaturesUtil::Check::check_feature_set_spec($spec);
 }
 
-$SPEC{check_feature_decl} = {
+$SPEC{check_features_decl} = {
     v => 1.1,
-    summary => 'Check specification in %FEATURES in a module',
+    summary => 'Check %FEATURES in a module',
     args => {
         %argspecreq0_module,
-        %argspec_detail,
     },
 };
 sub check_features_decl {
     require Module::FeaturesUtil::Check;
+
     my %args = @_;
 
-    my $mod = "Module::Features::$args{module}";
+    my $mod = $args{module};
     (my $modpm = "$mod.pm") =~ s!::!/!g;
     require $modpm;
 
     my $features = \%{"$mod\::FEATURES"};
     Module::FeaturesUtil::Check::check_features_decl($features);
+}
+
+$SPEC{check_module_features} = {
+    v => 1.1,
+    summary => 'Check %FEATURES in a module and return the value of specified feature',
+    args => {
+        %argspecreq0_module,
+        %argspec1_feature_name,
+    },
+};
+sub check_module_features {
+    require Module::FeaturesUtil::Check;
+
+    my %args = @_;
+    my $fname = $args{feature_name};
+
+    my $mod = $args{module};
+    (my $modpm = "$mod.pm") =~ s!::!/!g;
+    require $modpm;
+
+    my $features = \%{"$mod\::FEATURES"};
+    my $res = Module::FeaturesUtil::Check::check_features_decl($features);
+    return $res unless $res->[0] == 200;
+
+    if (defined $fname) {
+        my @fsetnames = sort keys %$features;
+        return [412, "There are no feature sets declared by $mod"]
+            unless @fsetnames;
+
+        my $fsetname;
+        if ($fname =~ m!(.+)(/|::)(.+)!) {
+            $fsetname = $1;
+            $fname = $3;
+            $fsetname =~ s!/!::!g;
+        } else {
+            return [400, "Please prefix feature name with feature set name (e.g. $fsetnames[0]/foo), there are more than one feature sets: ".join(", ", @fsetnames)]
+                unless @fsetnames == 1;
+            $fsetname = $fsetnames[0];
+        }
+        my $set_feature = $features->{$fsetname}
+            or return [404, "No such feature set name declared: $fsetname"];
+        [200, "OK", $set_feature->{$fname}];
+    } else {
+        [200, "OK", $features];
+    }
 }
 
 1;
