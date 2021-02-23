@@ -13,6 +13,11 @@ use Perinci::Sub::Args::Common::CLI qw(%argspec_detail);
 
 our %SPEC;
 
+$SPEC{':package'} = {
+    v => 1.1,
+    summary => 'CLI Utilities related to Module::Features',
+};
+
 our %argspecreq0_feature_set = (
     feature_set => {
         schema => 'perl::modulefeatures::modname*',
@@ -48,10 +53,26 @@ _
     },
 );
 
-$SPEC{':package'} = {
-    v => 1.1,
-    summary => 'CLI Utilities related to Module::Features',
-};
+sub _get_features_decl {
+    my $mod = shift;
+
+    # first, try to get features declaration from MODNAME::_ModuleFeatures's %FEATURES
+    my $proxymod = "$mod\::_ModuleFeatures";
+    (my $proxymodpm = "$proxymod.pm") =~ s!::!/!g;
+    eval { require $proxymodpm; 1 };
+    unless ($@) {
+        my $features = \%{"$proxymod\::FEATURES"};
+        return $features if scalar keys %$features;
+    }
+
+    # second, try to get features declaration from MODNAME %FEATURES
+    (my $modpm = "$mod.pm") =~ s!::!/!g;
+    require $modpm;
+
+    # XXX compare the two if both declarations exist
+
+    \%{"$mod\::FEATURES"};
+}
 
 $SPEC{list_feature_sets} = {
     v => 1.1,
@@ -157,13 +178,10 @@ sub check_features_decl {
     require Module::FeaturesUtil::Check;
 
     my %args = @_;
-
     my $mod = $args{module};
-    (my $modpm = "$mod.pm") =~ s!::!/!g;
-    require $modpm;
 
-    my $features = \%{"$mod\::FEATURES"};
-    Module::FeaturesUtil::Check::check_features_decl($features);
+    my $features_decl = _get_features_decl($mod);
+    Module::FeaturesUtil::Check::check_features_decl($features_decl);
 }
 
 $SPEC{check_module_features} = {
@@ -179,17 +197,16 @@ sub check_module_features {
 
     my %args = @_;
     my $fname = $args{feature_name};
-
     my $mod = $args{module};
-    (my $modpm = "$mod.pm") =~ s!::!/!g;
-    require $modpm;
 
-    my $features = \%{"$mod\::FEATURES"};
-    my $res = Module::FeaturesUtil::Check::check_features_decl($features);
+    my $features_decl = _get_features_decl($mod);;
+    my $res = Module::FeaturesUtil::Check::check_features_decl($features_decl);
     return $res unless $res->[0] == 200;
 
+    return [200, "No features"] unless $features_decl->{features};
+
     if (defined $fname) {
-        my @fsetnames = sort keys %$features;
+        my @fsetnames = sort keys %{ $features_decl->{features} };
         return [412, "There are no feature sets declared by $mod"]
             unless @fsetnames;
 
@@ -203,11 +220,11 @@ sub check_module_features {
                 unless @fsetnames == 1;
             $fsetname = $fsetnames[0];
         }
-        my $set_feature = $features->{$fsetname}
+        my $set_features = $features_decl->{features}{$fsetname}
             or return [404, "No such feature set name declared: $fsetname"];
-        [200, "OK", $set_feature->{$fname}];
+        [200, "OK", $set_features->{$fname}];
     } else {
-        [200, "OK", $features];
+        [200, "OK", $features_decl->{features}];
     }
 }
 
