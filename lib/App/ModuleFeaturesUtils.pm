@@ -53,27 +53,6 @@ _
     },
 );
 
-sub _get_features_decl {
-    my $mod = shift;
-
-    # first, try to get features declaration from MODNAME::_ModuleFeatures's %FEATURES
-    my $proxymod = "$mod\::_ModuleFeatures";
-    (my $proxymodpm = "$proxymod.pm") =~ s!::!/!g;
-    eval { require $proxymodpm; 1 };
-    unless ($@) {
-        my $features = \%{"$proxymod\::FEATURES"};
-        return $features if scalar keys %$features;
-    }
-
-    # second, try to get features declaration from MODNAME %FEATURES
-    (my $modpm = "$mod.pm") =~ s!::!/!g;
-    require $modpm;
-
-    # XXX compare the two if both declarations exist
-
-    \%{"$mod\::FEATURES"};
-}
-
 $SPEC{list_feature_sets} = {
     v => 1.1,
     summary => 'List feature sets (in modules under Module::Features:: namespace)',
@@ -176,11 +155,12 @@ $SPEC{check_features_decl} = {
 };
 sub check_features_decl {
     require Module::FeaturesUtil::Check;
+    require Module::FeaturesUtil::Get;
 
     my %args = @_;
     my $mod = $args{module};
 
-    my $features_decl = _get_features_decl($mod);
+    my $features_decl = Module::FeaturesUtil::Get::get_features_decl($mod);
     Module::FeaturesUtil::Check::check_features_decl($features_decl);
 }
 
@@ -194,12 +174,13 @@ $SPEC{check_module_features} = {
 };
 sub check_module_features {
     require Module::FeaturesUtil::Check;
+    require Module::FeaturesUtil::Get;
 
     my %args = @_;
     my $fname = $args{feature_name};
     my $mod = $args{module};
 
-    my $features_decl = _get_features_decl($mod);;
+    my $features_decl = Module::FeaturesUtil::Get::get_features_decl($mod);;
     my $res = Module::FeaturesUtil::Check::check_features_decl($features_decl);
     return $res unless $res->[0] == 200;
 
