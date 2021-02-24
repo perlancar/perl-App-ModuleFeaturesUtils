@@ -160,7 +160,7 @@ sub check_features_decl {
     my %args = @_;
     my $mod = $args{module};
 
-    my $features_decl = Module::FeaturesUtil::Get::get_features_decl($mod);
+    my $features_decl = Module::FeaturesUtil::Get::get_features_decl($mod, 'load');
     Module::FeaturesUtil::Check::check_features_decl($features_decl);
 }
 
@@ -180,7 +180,7 @@ sub check_module_features {
     my $fname = $args{feature_name};
     my $mod = $args{module};
 
-    my $features_decl = Module::FeaturesUtil::Get::get_features_decl($mod);;
+    my $features_decl = Module::FeaturesUtil::Get::get_features_decl($mod, 'load');;
     my $res = Module::FeaturesUtil::Check::check_features_decl($features_decl);
     return $res unless $res->[0] == 200;
 
