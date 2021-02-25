@@ -53,6 +53,34 @@ _
     },
 );
 
+$SPEC{get_feature_set_spec} = {
+    v => 1.1,
+    summary => 'Get feature set specification',
+    args => {
+        %argspecreq0_feature_set,
+    },
+};
+sub get_feature_set_spec {
+    require Module::FeaturesUtil::Get;
+
+    my %args = @_;
+    [200, "OK", Module::FeaturesUtil::Get::get_feature_set_spec($args{feature_set}, 'load')];
+}
+
+$SPEC{get_features_decl} = {
+    v => 1.1,
+    summary => 'Get features declaration',
+    args => {
+        %argspecreq0_module,
+    },
+};
+sub get_features_decl {
+    require Module::FeaturesUtil::Get;
+
+    my %args = @_;
+    [200, "OK", Module::FeaturesUtil::Get::get_features_decl($args{module}, 'load')];
+}
+
 $SPEC{list_feature_sets} = {
     v => 1.1,
     summary => 'List feature sets (in modules under Module::Features:: namespace)',
