@@ -8,6 +8,7 @@ package App::ModuleFeaturesUtils;
 use 5.010001;
 use strict 'subs', 'vars';
 use warnings;
+use Log::ger;
 
 use Perinci::Sub::Args::Common::CLI qw(%argspec_detail);
 
@@ -235,6 +236,60 @@ sub check_module_features {
     } else {
         [200, "OK", $features_decl->{features}];
     }
+}
+
+$SPEC{compare_module_features} = {
+    v => 1.1,
+    summary => 'Return a table data comparing features from several modules',
+    args => {
+        modules => {
+            'x.name.is_plural' => 1,
+            'x.name.singular' => 'module',
+            schema => ['array*', of=>'perl::modname*'],
+            req => 1,
+            pos => 0,
+            slurpy => 1,
+        },
+    },
+};
+sub compare_module_features {
+    require Module::FeaturesUtil::Get;
+
+    my %args = @_;
+    my $modules = $args{modules};
+
+    my %features_decls; # key = module name
+    my %fsetspecs; # key = fsetname
+    my @modules;
+    my %fsetnames;
+    for my $module (@$modules) {
+        if ($module_feaures{$module}) {
+            log_error "Module $module is specified more than once, ignoring";
+            next;
+        }
+        push @modules, $module;
+        my $features_decl = Module::FeaturesUtil::Get::get_features_decl($module. 'load', 'fatal');
+        for my $fsetname (sort keys %{ $features_decl->{features} }) {
+            unless ($fsetnames{$fsetname}++) {
+                $fsetspecs{$fsetname} = Module::FeaturesUtil::Get::get_feature_set_spec($fsetname', 'load', 'fatal');
+            }
+        }
+        $features_decls{$module} = $features_decl;
+    }
+    my @fsetnames = sort keys %fsetnames;
+
+    my @rows;
+    my %row
+    for my $fsetname (@fsetnames) {
+
+    }
+
+    my @fsetnames;
+    for my $module (@modules) {
+        my $features_decl = $features_decls{$module};
+
+    }
+
 }
 
 1;
